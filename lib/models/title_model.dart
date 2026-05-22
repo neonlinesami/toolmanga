@@ -69,34 +69,33 @@ class MangaTitle {
   ///   3. /uploads/covers/filename.png     → https://tomilo-lib.ru/uploads/covers/...
   ///   4. https://tomilolib.s3.regru.cloud → https://s3.regru.cloud/tomilolib/...
   String get coverUrl {
-    const siteBase = 'https://tomilo-lib.ru';
     const oldS3 = 'https://tomilolib.s3.regru.cloud';
-    const newS3 = 'https://s3.regru.cloud/tomilolib';
+    const s3Base = 'https://s3.regru.cloud/tomilolib';
 
     if (coverImage == null || coverImage!.isEmpty) {
-      // Фолбэк: пробуем стандартный путь на сайте
-      return '$siteBase/uploads/titles/$id/cover.jpg';
+      return '$s3Base/titles/$id/cover.jpg';
     }
 
     final img = coverImage!;
 
-    // Случай 4: старый S3 домен
+    // Уже полный старый S3 → переписываем на новый
     if (img.startsWith(oldS3)) {
-      return img.replaceFirst(oldS3, newS3);
+      return img.replaceFirst(oldS3, s3Base);
     }
 
-    // Случай: уже полный https URL (другой домен)
+    // Уже полный новый S3 → оставляем
+    if (img.startsWith(s3Base)) {
+      return img;
+    }
+
+    // Любой другой полный URL → оставляем
     if (img.startsWith('https://') || img.startsWith('http://')) {
       return img;
     }
 
-    // Случаи 1, 2, 3: относительный путь — добавляем базу сайта
-    if (img.startsWith('/')) {
-      return '$siteBase$img';
-    }
-
-    // Любой другой вариант
-    return '$siteBase/$img';
+    // /uploads/titles/{id}/cover.* → убираем /uploads, кладём на S3
+    final normalized = img.replaceFirst('/uploads', '');
+    return '$s3Base$normalized';
   }
 
   String get typeLabel {

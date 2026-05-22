@@ -1137,23 +1137,26 @@ class _WebtoonPageImage extends StatelessWidget {
           ),
         ),
       ),
-      errorWidget: (_, __, ___) => AspectRatio(
-        aspectRatio: 3 / 4,
-        child: Container(
-          color: const Color(0xFF0C0C18),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.broken_image_outlined,
-                  color: Colors.white.withOpacity(0.1), size: 36),
-              const SizedBox(height: 8),
-              Text('Стр. ${index + 1}',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.15), fontSize: 12)),
-            ],
+      errorWidget: (_, url, error) {
+        print('PAGE_IMG_ERROR: $url | $error');
+        return AspectRatio(
+          aspectRatio: 3 / 4,
+          child: Container(
+            color: const Color(0xFF0C0C18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.broken_image_outlined,
+                    color: Colors.white.withOpacity(0.1), size: 36),
+                const SizedBox(height: 8),
+                Text('Стр. ${index + 1}',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.15), fontSize: 12)),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

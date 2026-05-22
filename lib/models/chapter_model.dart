@@ -25,6 +25,15 @@ class Chapter {
     this.ratingCount = 0,
   });
 
+  // Геттер, который проверяет, заблокирована ли глава для пользователя.
+  // Глава заблокирована, если она платная (isPaid), и время бесплатного доступа (freeAt)
+  // либо еще не наступило, либо вообще не задано.
+  bool get isLocked {
+    if (!isPaid) return false;
+    if (freeAt == null) return true;
+    return DateTime.now().isBefore(freeAt!);
+  }
+
   factory Chapter.fromJson(Map<String, dynamic> json) {
     String titleId = '';
     if (json['titleId'] is Map) {
@@ -36,28 +45,17 @@ class Chapter {
     return Chapter(
       id: json['_id'] ?? '',
       titleId: titleId,
-      chapterNumber: json['chapterNumber'] ?? 0,
+      chapterNumber: (json['chapterNumber'] as num?)?.toInt() ?? 0,
       name: json['name'] ?? 'Глава ${json['chapterNumber']}',
       releaseDate: json['releaseDate'] != null
           ? DateTime.tryParse(json['releaseDate'])
           : null,
       isPaid: json['isPaid'] ?? false,
-      unlockPrice: json['unlockPrice'] ?? 0,
+      unlockPrice: (json['unlockPrice'] as num?)?.toInt() ?? 0,
       freeAt: json['freeAt'] != null ? DateTime.tryParse(json['freeAt']) : null,
-      views: json['views'] ?? 0,
+      views: (json['views'] as num?)?.toInt() ?? 0,
       ratingSum: (json['ratingSum'] as num?)?.toDouble(),
-      ratingCount: json['ratingCount'] ?? 0,
+      ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
     );
   }
-
-  bool get isLocked {
-    if (!isPaid) return false;
-    if (freeAt == null) return true;
-    return DateTime.now().isBefore(freeAt!);
-  }
-
-  double get rating {
-    if (ratingCount == 0) return 0;
-    return (ratingSum ?? 0) / ratingCount;
-  }
-}
+} // <-- Вот эта скобка у вас отсутствовала!

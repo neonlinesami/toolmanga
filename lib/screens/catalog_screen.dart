@@ -744,11 +744,14 @@ class _TitleCard extends StatelessWidget {
                     },
                     placeholder: (_, __) =>
                         Container(color: const Color(0xFF1E1E32)),
-                    errorWidget: (_, __, ___) => Container(
-                      color: const Color(0xFF1E1E32),
-                      child: const Icon(Icons.broken_image_outlined,
-                          color: Colors.white12, size: 28),
-                    ),
+                    errorWidget: (_, url, error) {
+                      print('IMG_ERROR url=$url | err=$error');
+                      return Container(
+                        color: const Color(0xFF1E1E32),
+                        child: const Icon(Icons.broken_image_outlined,
+                            color: Colors.white12, size: 28),
+                      );
+                    },
                   ),
                   if (title.averageRating != null)
                     Positioned(
@@ -790,7 +793,7 @@ class _TitleCard extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.6)
+                            Colors.black.withOpacity(0.6),
                           ],
                         ),
                       ),

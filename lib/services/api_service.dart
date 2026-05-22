@@ -98,11 +98,15 @@ class ApiService {
         'sortOrder': sortOrder,
       },
     );
+    print('CHAPTERS_URL: $uri');
 
     try {
       final response = await http
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 15));
+
+      print('CHAPTERS_STATUS: ${response.statusCode}');
+      print('CHAPTERS_BODY: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
 
       if (response.statusCode == 404) return [];
       if (response.statusCode != 200) return [];
@@ -116,7 +120,8 @@ class ApiService {
       return chaptersJson
           .map((j) => Chapter.fromJson(j as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      print('CHAPTERS_EXCEPTION: $e');
       return [];
     }
   }
@@ -141,6 +146,12 @@ class ApiService {
       throw Exception('API вернул ошибку для главы $chapterId');
     }
 
+    // Извлекаем titleId из ответа
+    final titleIdRaw = data['data']?['titleId'];
+    final String? titleId = titleIdRaw is Map
+        ? titleIdRaw['_id'] as String?
+        : titleIdRaw as String?;
+
     final pages = data['data']?['pages'] as List?;
     if (pages == null || pages.isEmpty) {
       throw Exception('Нет страниц в этой главе');
@@ -150,17 +161,22 @@ class ApiService {
       final path = p.toString();
       print('PAGE_RAW: $path');
       String url;
+
       if (path.startsWith('https://') || path.startsWith('http://')) {
         if (path.startsWith(_oldS3)) {
           url = path.replaceFirst(_oldS3, _s3Base);
         } else {
           url = path;
         }
+      } else if (path.startsWith('/chapters/')) {
+        // /chapters/{chapterId}/001.webp → S3: chapters/{chapterId}/001.webp
+        url = '$_s3Base$path';
       } else if (path.startsWith('/')) {
         url = '$_site$path';
       } else {
         url = '$_site/$path';
       }
+
       print('PAGE_URL: $url');
       return url;
     }).toList();

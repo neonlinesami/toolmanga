@@ -33,14 +33,17 @@ class _TitleScreenState extends State<TitleScreen> {
 
   Future<void> _loadChapters() async {
     try {
+      print('CHAPTERS_LOAD: titleId=${widget.title.id}');
       final chapters =
-          await ApiService.getChapters(widget.title.id, sortOrder: _chapterSort);
+      await ApiService.getChapters(widget.title.id, sortOrder: _chapterSort);
+      print('CHAPTERS_RESULT: count=${chapters.length}');
       if (mounted)
         setState(() {
           _chapters = chapters;
           _loadingChapters = false;
         });
     } catch (e) {
+      print('CHAPTERS_ERROR: $e');
       if (mounted) setState(() => _loadingChapters = false);
     }
   }
