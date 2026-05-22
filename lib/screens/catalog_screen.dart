@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -76,7 +77,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
           _hasMore = _page < _totalPages;
         });
       }
-    } catch (e) {
+    } on TimeoutException catch (e) {
+      debugPrint('❌ Таймаут запроса каталога: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Сервер не отвечает. Проверь интернет-соединение.'),
+            backgroundColor: const Color(0xFF1E1E30),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('❌ Ошибка загрузки каталога: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

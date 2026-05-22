@@ -11,7 +11,7 @@ class ApiService {
 
   static const Map<String, String> _headers = {
     'User-Agent':
-        'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+    'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
     'Accept':   'application/json',
     'Referer':  '$_site/',
@@ -46,17 +46,35 @@ class ApiService {
     };
 
     final uri = Uri.parse('$_apiBase/titles').replace(queryParameters: params);
-    final response = await http
-        .get(uri, headers: _headers)
-        .timeout(const Duration(seconds: 15));
+    print('!!!TITLES_START: $uri');
+    late http.Response response;
+    try {
+      response = await http
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      print('!!!TITLES_EXCEPTION: $e');
+      rethrow;
+    }
+    print('!!!TITLES_STATUS: ${response.statusCode}');
+    print('!!!TITLES_BODY_START: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (data['success'] == true) {
         final titlesJson = data['data']['titles'] as List;
+        // DEBUG: log first 5 coverImage values
+        for (int i = 0; i < titlesJson.length && i < 5; i++) {
+          final t = titlesJson[i];
+          print('COVER_RAW[$i]: ${t['coverImage']}');
+        }
         final pagination = data['data']['pagination'] ?? {};
+        final titles = titlesJson.map((j) => MangaTitle.fromJson(j)).toList();
+        for (int i = 0; i < titles.length && i < 5; i++) {
+          print('COVER_URL[$i]: ${titles[i].coverUrl}');
+        }
         return {
-          'titles': titlesJson.map((j) => MangaTitle.fromJson(j)).toList(),
+          'titles': titles,
           'total':  pagination['total'] ?? 0,
           'pages':  pagination['pages'] ?? 1,
           'page':   pagination['page']  ?? 1,
@@ -69,10 +87,10 @@ class ApiService {
   // ── Chapters ────────────────────────────────────────────────────────────────
 
   static Future<List<Chapter>> getChapters(
-    String titleId, {
-    String sortOrder = 'asc',
-    int limit = 10000,
-  }) async {
+      String titleId, {
+        String sortOrder = 'asc',
+        int limit = 10000,
+      }) async {
     final uri = Uri.parse('$_apiBase/chapters/title/$titleId').replace(
       queryParameters: {
         'page':      '1',
@@ -130,24 +148,21 @@ class ApiService {
 
     return pages.map((p) {
       final path = p.toString();
-
-      // Уже полный URL
+      print('PAGE_RAW: $path');
+      String url;
       if (path.startsWith('https://') || path.startsWith('http://')) {
-        // Нормализуем старый S3 домен если попался
         if (path.startsWith(_oldS3)) {
-          return path.replaceFirst(_oldS3, _s3Base);
+          url = path.replaceFirst(_oldS3, _s3Base);
+        } else {
+          url = path;
         }
-        return path;
+      } else if (path.startsWith('/')) {
+        url = '$_site$path';
+      } else {
+        url = '$_site/$path';
       }
-
-      // Относительный путь → добавляем базу сайта
-      // Пример: /titles/{id}/chapters/{id}/001.jpg
-      if (path.startsWith('/')) {
-        return '$_site$path';
-      }
-
-      // Путь без слеша (маловероятно, но на всякий случай)
-      return '$_site/$path';
+      print('PAGE_URL: $url');
+      return url;
     }).toList();
   }
 
