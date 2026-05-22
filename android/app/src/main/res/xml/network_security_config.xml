@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">tomilo-lib.ru</domain>
+        <domain includeSubdomains="true">s3.regru.cloud</domain>
+    </domain-config>
+</network-security-config>
