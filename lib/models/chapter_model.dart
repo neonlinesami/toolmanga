@@ -10,6 +10,7 @@ class Chapter {
   final int views;
   final double? ratingSum;
   final int ratingCount;
+  final List<String> pages; // страницы из ответа getChapters
 
   Chapter({
     required this.id,
@@ -23,6 +24,7 @@ class Chapter {
     this.views = 0,
     this.ratingSum,
     this.ratingCount = 0,
+    this.pages = const [],
   });
 
   // Геттер, который проверяет, заблокирована ли глава для пользователя.
@@ -56,6 +58,7 @@ class Chapter {
       views: (json['views'] as num?)?.toInt() ?? 0,
       ratingSum: (json['ratingSum'] as num?)?.toDouble(),
       ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
+      pages: (json['pages'] as List?)?.map((p) => p.toString()).toList() ?? [],
     );
   }
 } // <-- Вот эта скобка у вас отсутствовала!

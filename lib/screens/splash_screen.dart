@@ -199,29 +199,23 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Логотип приложения — силуэт воина с мечом на красном круге
 class _AppLogo extends StatelessWidget {
   final double size;
   const _AppLogo({this.size = 80});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFCC2222).withOpacity(0.5),
-            blurRadius: 30,
-            spreadRadius: 4,
-          ),
-        ],
-      ),
-      child: CustomPaint(
-        painter: _LogoPainter(),
-        size: Size(size, size),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24), // Чтобы квадратная иконка была со скругленными углами
+        child: Image.asset(
+          'assets/icon/app_icon.png', // <-- Путь заменен на вашу иконку
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

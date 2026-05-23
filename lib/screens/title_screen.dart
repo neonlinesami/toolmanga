@@ -22,6 +22,8 @@ class _TitleScreenState extends State<TitleScreen> {
   bool _descExpanded = false;
   String _chapterSort = 'asc';
   Map<String, dynamic>? _lastRead;
+  int _chaptersLoaded = 0;
+  int _chaptersTotal = 0;
 
   @override
   void initState() {
@@ -34,8 +36,16 @@ class _TitleScreenState extends State<TitleScreen> {
   Future<void> _loadChapters() async {
     try {
       print('CHAPTERS_LOAD: titleId=${widget.title.id}');
-      final chapters =
-      await ApiService.getChapters(widget.title.id, sortOrder: _chapterSort);
+      final chapters = await ApiService.getChapters(
+        widget.title.id,
+        sortOrder: _chapterSort,
+        onProgress: (loaded, total) {
+          if (mounted) setState(() {
+            _chaptersLoaded = loaded;
+            _chaptersTotal = total;
+          });
+        },
+      );
       print('CHAPTERS_RESULT: count=${chapters.length}');
       if (mounted)
         setState(() {
@@ -69,7 +79,7 @@ class _TitleScreenState extends State<TitleScreen> {
           backgroundColor: const Color(0xFF1E1E32),
           behavior: SnackBarBehavior.floating,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -115,12 +125,23 @@ class _TitleScreenState extends State<TitleScreen> {
           SliverToBoxAdapter(child: _buildGenres()),
           SliverToBoxAdapter(child: _buildChaptersHeader()),
           if (_loadingChapters)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Center(
                 child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child:
-                      CircularProgressIndicator(color: Color(0xFF7C6FF7), strokeWidth: 2),
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: Color(0xFF7C6FF7), strokeWidth: 2),
+                      if (_chaptersTotal > 0) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Загружено $_chaptersLoaded из $_chaptersTotal',
+                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             )
@@ -137,7 +158,7 @@ class _TitleScreenState extends State<TitleScreen> {
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (ctx, i) => _ChapterTile(
+                    (ctx, i) => _ChapterTile(
                   chapter: _chapters[i],
                   isLastRead: _lastRead?['chapterId'] == _chapters[i].id,
                   onTap: () => _openChapter(_chapters[i]),
@@ -249,7 +270,7 @@ class _TitleScreenState extends State<TitleScreen> {
             Text(
               widget.title.altNames.first,
               style:
-                  TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
+              TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
             ),
           ],
           const SizedBox(height: 12),
@@ -263,8 +284,8 @@ class _TitleScreenState extends State<TitleScreen> {
                 color: widget.title.status == 'ongoing'
                     ? const Color(0xFF00C896)
                     : widget.title.status == 'completed'
-                        ? const Color(0xFF636E90)
-                        : const Color(0xFFE17055),
+                    ? const Color(0xFF636E90)
+                    : const Color(0xFFE17055),
               ),
               if (widget.title.releaseYear != null)
                 _Chip(
@@ -443,18 +464,18 @@ class _TitleScreenState extends State<TitleScreen> {
         runSpacing: 7,
         children: widget.title.genres
             .map((g) => Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF161625),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: Colors.white.withOpacity(0.08), width: 1),
-                  ),
-                  child: Text(g,
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.55), fontSize: 12)),
-                ))
+          padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161625),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: Colors.white.withOpacity(0.08), width: 1),
+          ),
+          child: Text(g,
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.55), fontSize: 12)),
+        ))
             .toList(),
       ),
     );
@@ -549,9 +570,9 @@ class _StatBlock extends StatelessWidget {
   final Color color;
   const _StatBlock(
       {required this.icon,
-      required this.value,
-      required this.label,
-      required this.color});
+        required this.value,
+        required this.label,
+        required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -585,8 +606,8 @@ class _ChapterTile extends StatelessWidget {
 
   const _ChapterTile(
       {required this.chapter,
-      required this.isLastRead,
-      required this.onTap});
+        required this.isLastRead,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -602,7 +623,7 @@ class _ChapterTile extends StatelessWidget {
               : Colors.transparent,
           border: Border(
               bottom:
-                  BorderSide(color: Colors.white.withOpacity(0.05), width: 1)),
+              BorderSide(color: Colors.white.withOpacity(0.05), width: 1)),
         ),
         child: Row(
           children: [

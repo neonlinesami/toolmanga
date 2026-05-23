@@ -86,7 +86,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             backgroundColor: const Color(0xFF1E1E30),
             behavior: SnackBarBehavior.floating,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -99,7 +99,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             backgroundColor: const Color(0xFF1E1E30),
             behavior: SnackBarBehavior.floating,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -139,8 +139,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   bool get _hasActiveFilters =>
       _selectedType != null ||
-      _selectedStatus != null ||
-      _sortBy != 'weekViews';
+          _selectedStatus != null ||
+          _sortBy != 'weekViews';
 
   @override
   Widget build(BuildContext context) {
@@ -154,10 +154,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: _selectedNav == 0
                   ? _buildCatalog()
                   : _selectedNav == 1
-                      ? const BookmarksScreen()
-                      : _selectedNav == 3
-                          ? const ProfileScreen()
-                          : const HistoryScreen(),
+                  ? const BookmarksScreen()
+                  : _selectedNav == 3
+                  ? const ProfileScreen()
+                  : const HistoryScreen(),
             ),
           ],
         ),
@@ -169,6 +169,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget _buildHeader() {
     String title;
     switch (_selectedNav) {
+      case 0:
+        title = 'Каталог';
+        break;
       case 1:
         title = 'Закладки';
         break;
@@ -176,7 +179,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         title = 'Профиль';
         break;
       default:
-        title = 'Tomilo Lib';
+        title = 'Каталог';
     }
 
     return AnimatedContainer(
@@ -186,32 +189,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
         color: const Color(0xFF0A0A14),
         border: Border(
           bottom:
-              BorderSide(color: Colors.white.withOpacity(0.06), width: 1),
+          BorderSide(color: Colors.white.withOpacity(0.06), width: 1),
         ),
       ),
       child: Row(
         children: [
-          // Лого
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C6FF7), Color(0xFFD63891)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text('T',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18)),
-            ),
-          ),
-          const SizedBox(width: 10),
           Text(
             title,
             style: const TextStyle(
@@ -241,7 +223,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               children: [
                 IconButton(
                   icon:
-                      const Icon(Icons.tune_rounded, color: Colors.white70),
+                  const Icon(Icons.tune_rounded, color: Colors.white70),
                   onPressed: _showFilters,
                   style: IconButton.styleFrom(
                     backgroundColor: _hasActiveFilters
@@ -280,43 +262,43 @@ class _CatalogScreenState extends State<CatalogScreen> {
       child: _titles.isEmpty && _loading
           ? _buildShimmer()
           : _titles.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.grid_off_rounded,
-                          color: Colors.white12, size: 64),
-                      const SizedBox(height: 16),
-                      const Text('Ничего не найдено',
-                          style:
-                              TextStyle(color: Colors.white38, fontSize: 16)),
-                    ],
-                  ),
-                )
-              : GridView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.55,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _titles.length + (_hasMore ? 3 : 0),
-                  itemBuilder: (ctx, i) {
-                    if (i >= _titles.length) return _buildShimmerCard();
-                    return _TitleCard(
-                      title: _titles[i],
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TitleScreen(title: _titles[i]),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.grid_off_rounded,
+                color: Colors.white12, size: 64),
+            const SizedBox(height: 16),
+            const Text('Ничего не найдено',
+                style:
+                TextStyle(color: Colors.white38, fontSize: 16)),
+          ],
+        ),
+      )
+          : GridView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+        gridDelegate:
+        const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 0.55,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: _titles.length + (_hasMore ? 3 : 0),
+        itemBuilder: (ctx, i) {
+          if (i >= _titles.length) return _buildShimmerCard();
+          return _TitleCard(
+            title: _titles[i],
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TitleScreen(title: _titles[i]),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -387,6 +369,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 }
 
+// ─── Dynamic Island–style bottom nav ──────────────────────────────────────────
 // ─── Dynamic Island–style bottom nav ──────────────────────────────────────────
 class _DutyIsBottomNav extends StatelessWidget {
   final int selectedIndex;
@@ -464,7 +447,13 @@ class _DutyIsBottomNav extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: CustomPaint(painter: _MiniLogoPainter()),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(25),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -507,7 +496,7 @@ class _IslandNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color =
-        active ? const Color(0xFF7C6FF7) : Colors.white.withOpacity(0.38);
+    active ? const Color(0xFF7C6FF7) : Colors.white.withOpacity(0.38);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -533,7 +522,7 @@ class _IslandNavItem extends StatelessWidget {
                 color: color,
                 fontSize: 9.5,
                 fontWeight:
-                    active ? FontWeight.w600 : FontWeight.normal,
+                active ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -948,7 +937,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(
-                    () => {_sort = 'weekViews', _type = null, _status = null}),
+                        () => {_sort = 'weekViews', _type = null, _status = null}),
                 child: const Text('Сбросить',
                     style: TextStyle(
                         color: Color(0xFF7C6FF7),
@@ -962,20 +951,20 @@ class _FilterSheetState extends State<_FilterSheet> {
               'Сортировка',
               _sortOptions.map((o) => (o.$1, o.$2)).toList(),
               _sort,
-              (v) => setState(() => _sort = v!)),
+                  (v) => setState(() => _sort = v!)),
           const SizedBox(height: 16),
           _buildSection(
               'Тип',
               _typeOptions.map((o) => (o.$1, o.$2)).toList(),
               _type,
-              (v) => setState(() => _type = v),
+                  (v) => setState(() => _type = v),
               nullable: true),
           const SizedBox(height: 16),
           _buildSection(
               'Статус',
               _statusOptions.map((o) => (o.$1, o.$2)).toList(),
               _status,
-              (v) => setState(() => _status = v),
+                  (v) => setState(() => _status = v),
               nullable: true),
           const SizedBox(height: 24),
           SizedBox(
@@ -1027,7 +1016,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? const Color(0xFF7C6FF7)

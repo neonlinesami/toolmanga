@@ -89,41 +89,70 @@ class ApiService {
   static Future<List<Chapter>> getChapters(
       String titleId, {
         String sortOrder = 'asc',
-        int limit = 10000,
+        void Function(int loaded, int total)? onProgress,
       }) async {
-    final uri = Uri.parse('$_apiBase/chapters/title/$titleId').replace(
-      queryParameters: {
-        'page':      '1',
-        'limit':     limit.toString(),
-        'sortOrder': sortOrder,
-      },
-    );
-    print('CHAPTERS_URL: $uri');
+    final allChapters = <Chapter>[];
+    int page = 1;
+    const pageSize = 200; // максимум что отдаёт сервер за раз
 
-    try {
-      final response = await http
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 15));
+    while (true) {
+      final uri = Uri.parse('$_apiBase/chapters/title/$titleId').replace(
+        queryParameters: {
+          'page':      page.toString(),
+          'limit':     pageSize.toString(),
+          'sortOrder': sortOrder,
+        },
+      );
+      if (page == 1) print('CHAPTERS_URL: $uri');
 
-      print('CHAPTERS_STATUS: ${response.statusCode}');
-      print('CHAPTERS_BODY: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
+      try {
+        final response = await http
+            .get(uri, headers: _headers)
+            .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 404) return [];
-      if (response.statusCode != 200) return [];
+        if (page == 1) {
+          print('CHAPTERS_STATUS: ${response.statusCode}');
+          print('CHAPTERS_BODY: ${response.body.substring(0, response.body.length.clamp(0, 300))}');
+        }
 
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      if (data['success'] != true) return [];
+        if (response.statusCode == 404) break;
+        if (response.statusCode != 200) break;
 
-      final chaptersJson = data['data']?['chapters'] as List?;
-      if (chaptersJson == null) return [];
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['success'] != true) break;
 
-      return chaptersJson
-          .map((j) => Chapter.fromJson(j as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      print('CHAPTERS_EXCEPTION: $e');
-      return [];
+        final chaptersJson = data['data']?['chapters'] as List?;
+        if (chaptersJson == null || chaptersJson.isEmpty) break;
+
+        allChapters.addAll(
+          chaptersJson.map((j) => Chapter.fromJson(j as Map<String, dynamic>)),
+        );
+
+        // Логируем прогресс и total
+        final pagination = data['data']?['pagination'];
+        final totalCount = (pagination?['total'] as num?)?.toInt() ?? allChapters.length;
+
+        if (page == 1) {
+          final totalPages = pagination?['pages'] ?? '?';
+          print('CHAPTERS_TOTAL: $totalCount глав, $totalPages страниц');
+        }
+
+        onProgress?.call(allChapters.length, totalCount);
+
+        print('CHAPTERS_PAGE $page: получено ${chaptersJson.length}, всего накоплено ${allChapters.length}');
+
+        // Если пришло меньше чем запрашивали — это последняя страница
+        if (chaptersJson.length < pageSize) break;
+        page++;
+
+      } catch (e) {
+        print('CHAPTERS_EXCEPTION page=$page: $e');
+        break;
+      }
     }
+
+    print('CHAPTERS_RESULT: count=${allChapters.length}');
+    return allChapters;
   }
 
   // ── Pages ────────────────────────────────────────────────────────────────────
@@ -131,7 +160,13 @@ class ApiService {
   //   /titles/{titleId}/chapters/{chapterId}/001.jpg
   // Базовый URL — сайт (https://tomilo-lib.ru), НЕ S3!
 
-  static Future<List<String>> getPages(String chapterId) async {
+  static Future<List<String>> getPages(String chapterId, {List<String>? cachedPages, String? titleId}) async {
+    // Если страницы уже пришли вместе со списком глав — используем их
+    if (cachedPages != null && cachedPages.isNotEmpty) {
+      print('PAGES_FROM_CACHE: $chapterId (${cachedPages.length} стр.)');
+      return _resolvePageUrls(cachedPages, titleId, chapterId);
+    }
+
     final uri = Uri.parse('$_apiBase/chapters/$chapterId');
     final response = await http
         .get(uri, headers: _headers)
@@ -146,9 +181,8 @@ class ApiService {
       throw Exception('API вернул ошибку для главы $chapterId');
     }
 
-    // Извлекаем titleId из ответа
     final titleIdRaw = data['data']?['titleId'];
-    final String? titleId = titleIdRaw is Map
+    final String? resolvedTitleId = titleIdRaw is Map
         ? titleIdRaw['_id'] as String?
         : titleIdRaw as String?;
 
@@ -157,8 +191,16 @@ class ApiService {
       throw Exception('Нет страниц в этой главе');
     }
 
-    return pages.map((p) {
-      final path = p.toString();
+    return _resolvePageUrls(
+      pages.map((p) => p.toString()).toList(),
+      titleId ?? resolvedTitleId,
+      chapterId,
+    );
+  }
+
+  static List<String> _resolvePageUrls(
+      List<String> rawPages, String? titleId, String chapterId) {
+    return rawPages.map((path) {
       print('PAGE_RAW: $path');
       String url;
 
@@ -168,18 +210,47 @@ class ApiService {
         } else {
           url = path;
         }
+      } else if (path.startsWith('/titles/') || path.startsWith('titles/')) {
+        // Новый формат: /titles/{titleId}/chapters/{chapterId}/001.jpg → S3
+        final normalized = path.startsWith('/') ? path : '/$path';
+        url = '$_s3Base$normalized';
       } else if (path.startsWith('/chapters/')) {
-        // /chapters/{chapterId}/001.webp → S3: chapters/{chapterId}/001.webp
+        // Старый формат: /chapters/{chapterId}/001.jpeg → S3 без titleId
         url = '$_s3Base$path';
       } else if (path.startsWith('/')) {
-        url = '$_site$path';
+        url = '$_s3Base$path';
       } else {
-        url = '$_site/$path';
+        url = '$_s3Base/$path';
       }
 
       print('PAGE_URL: $url');
       return url;
     }).toList();
+  }
+
+  /// Строит fallback URL когда основной (S3 с titleId) не загрузился.
+  /// S3: s3.regru.cloud/tomilolib/titles/{tid}/chapters/{cid}/001.jpg → пробуем tomilo-lib.ru/titles/...
+  /// Сайт: tomilo-lib.ru/titles/... → пробуем S3
+  static String? buildFallbackUrl(String primaryUrl, String? titleId, String chapterId) {
+    final uri = Uri.tryParse(primaryUrl);
+    if (uri == null) return null;
+    final filename = uri.pathSegments.lastOrNull;
+    if (filename == null || !filename.contains('.')) return null;
+
+    if (!primaryUrl.startsWith(_s3Base)) return null;
+
+    final path = uri.path.replaceFirst('/tomilolib', '');
+
+    if (path.contains('/titles/')) {
+      // Новый формат → fallback старый (без titleId)
+      return '$_s3Base/chapters/$chapterId/$filename';
+    } else if (path.startsWith('/chapters/')) {
+      // Старый формат → fallback новый (с titleId)
+      if (titleId == null || titleId.isEmpty) return null;
+      return '$_s3Base/titles/$titleId/chapters/$chapterId/$filename';
+    }
+
+    return null;
   }
 
   // ── Title by id / slug ──────────────────────────────────────────────────────
