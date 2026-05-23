@@ -3,6 +3,14 @@ import 'package:http/http.dart' as http;
 import '../models/title_model.dart';
 import '../models/chapter_model.dart';
 
+/// Безопасно приводит Map<dynamic,dynamic> к Map<String,dynamic>.
+/// jsonDecode возвращает Map<dynamic,dynamic> — прямой каст падает в рантайме.
+Map<String, dynamic> _cast(dynamic m) =>
+    (m as Map).map((k, v) => MapEntry(k as String, v));
+
+Map<String, dynamic>? _castNullable(dynamic m) =>
+    m == null ? null : _cast(m);
+
 class ApiService {
   static const String _site    = 'https://tomilo-lib.ru';
   static const String _apiBase = '$_site/api';
@@ -125,7 +133,7 @@ class ApiService {
         if (chaptersJson == null || chaptersJson.isEmpty) break;
 
         allChapters.addAll(
-          chaptersJson.map((j) => Chapter.fromJson(j as Map<String, dynamic>)),
+          chaptersJson.map((j) => Chapter.fromJson(_cast(j))),
         );
 
         // Логируем прогресс и total
@@ -253,6 +261,109 @@ class ApiService {
     return null;
   }
 
+  // ── Latest updates (лента обновлений — реальный эндпоинт сайта) ────────────
+  // GET /api/titles/latest-updates?page=1&limit=48&includeAdult=true
+  // Возвращает главы с вложенным тайтлом, аналогично странице /updates на сайте.
+  static Future<Map<String, dynamic>> getLatestUpdates({
+    int page = 1,
+    int limit = 30,
+    bool includeAdult = true,
+  }) async {
+    final uri = Uri.parse('$_apiBase/titles/latest-updates').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        'includeAdult': includeAdult.toString(),
+      },
+    );
+
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception('latest-updates: HTTP ${response.statusCode}');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    if (data['success'] != true) {
+      throw Exception('latest-updates: API error');
+    }
+
+    // Ответ может быть двух форматов:
+    // 1. data.chapters[] — список глав с вложенным titleId-объектом
+    // 2. data.titles[]   — список тайтлов с вложенной lastChapter
+    final inner = _cast(data['data']);
+    final pagination = inner['pagination'] ?? {};
+
+    // Формат 1: chapters
+    if (inner.containsKey('chapters')) {
+      final chapters = inner['chapters'] as List;
+      final items = <UpdateItem>[];
+      for (final ch in chapters) {
+        try {
+          final titleJson = _castNullable(ch['titleId']);
+          if (titleJson == null) continue;
+          final title = MangaTitle.fromJson(titleJson);
+          final chapter = Chapter.fromJson(_cast(ch));
+          items.add(UpdateItem(title: title, chapter: chapter));
+        } catch (_) {}
+      }
+      return {
+        'items': items,
+        'pages': (pagination['pages'] as num?)?.toInt() ?? 1,
+        'page': (pagination['page'] as num?)?.toInt() ?? page,
+      };
+    }
+
+    // Формат 2: titles с lastChapter
+    if (inner.containsKey('titles')) {
+      final titles = inner['titles'] as List;
+      final items = <UpdateItem>[];
+      for (final t in titles) {
+        try {
+          final title = MangaTitle.fromJson(_cast(t));
+          final lastChJson = _castNullable(t['lastChapter']);
+          if (lastChJson == null) continue;
+          final chapter = Chapter.fromJson(lastChJson);
+          items.add(UpdateItem(title: title, chapter: chapter));
+        } catch (_) {}
+      }
+      return {
+        'items': items,
+        'pages': (pagination['pages'] as num?)?.toInt() ?? 1,
+        'page': (pagination['page'] as num?)?.toInt() ?? page,
+      };
+    }
+
+    throw Exception('latest-updates: неизвестный формат ответа');
+  }
+
+  // ── Latest chapter (только одна последняя глава тайтла) ────────────────────
+  // Используется в NewChaptersScreen: один лёгкий запрос вместо загрузки всех глав.
+  static Future<Chapter?> getLatestChapter(String titleId) async {
+    final uri = Uri.parse('$_apiBase/chapters/title/$titleId').replace(
+      queryParameters: {
+        'page': '1',
+        'limit': '1',
+        'sortOrder': 'desc',
+      },
+    );
+    try {
+      final response = await http
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data['success'] != true) return null;
+      final chaptersJson = data['data']?['chapters'] as List?;
+      if (chaptersJson == null || chaptersJson.isEmpty) return null;
+      return Chapter.fromJson(_cast(chaptersJson.first));
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Title by id / slug ──────────────────────────────────────────────────────
 
   static Future<Map<String, dynamic>?> getTitleById(String id) async {
@@ -261,7 +372,7 @@ class ApiService {
         .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       final json = jsonDecode(utf8.decode(response.bodyBytes));
-      return json['data'] as Map<String, dynamic>?;
+      return _castNullable(json['data']);
     }
     return null;
   }
@@ -272,8 +383,15 @@ class ApiService {
         .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       final json = jsonDecode(utf8.decode(response.bodyBytes));
-      return json['data'] as Map<String, dynamic>?;
+      return _castNullable(json['data']);
     }
     return null;
   }
+}
+
+/// Пара «тайтл + последняя глава» — результат ApiService.getLatestUpdates().
+class UpdateItem {
+  final MangaTitle title;
+  final Chapter chapter;
+  UpdateItem({required this.title, required this.chapter});
 }

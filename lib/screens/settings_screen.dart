@@ -16,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool   _showAdult      = false;
   String _defaultSort    = 'weekViews';
   bool   _loaded         = false;
+  String _storageSize    = '…';
 
   @override
   void initState() {
@@ -31,6 +32,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _showAdult    = p.getBool  ('app_showAdult')    ?? false;
       _defaultSort  = p.getString('app_defaultSort')  ?? 'weekViews';
       _loaded       = true;
+    });
+    _refreshStorageSize();
+  }
+
+  Future<void> _refreshStorageSize() async {
+    final bytes = await StorageService.estimateStorageBytes();
+    if (!mounted) return;
+    setState(() {
+      if (bytes < 1024) {
+        _storageSize = '$bytes Б';
+      } else if (bytes < 1024 * 1024) {
+        _storageSize = '${(bytes / 1024).toStringAsFixed(1)} КБ';
+      } else {
+        _storageSize = '${(bytes / 1024 / 1024).toStringAsFixed(2)} МБ';
+      }
     });
   }
 
@@ -53,12 +69,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _pruneProgress() async {
+    final removed = await StorageService.pruneProgress();
+    await _refreshStorageSize();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        _snack(removed > 0 ? 'Удалено $removed устаревших записей прогресса' : 'Лишних записей не найдено'),
+      );
+    }
+  }
+
   Future<void> _clearHistory() async {
     final ok = await _confirm('Очистить историю?', 'Все записи об истории чтения будут удалены.');
     if (!ok || !mounted) return;
     final p = await SharedPreferences.getInstance();
     await p.remove('reading_history');
     await p.remove('reading_progress');
+    await _refreshStorageSize();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(_snack('История и прогресс очищены'));
   }
 
@@ -67,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!ok || !mounted) return;
     final p = await SharedPreferences.getInstance();
     await p.remove('bookmarks');
+    await _refreshStorageSize();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(_snack('Закладки очищены'));
   }
 
@@ -183,12 +211,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // ── Хранилище ────────────────────────────────────
                   _sectionLabel('ХРАНИЛИЩЕ'),
                   _buildCard([
+                    _infoRow(icon: Icons.storage_rounded, label: 'Данные приложения', value: _storageSize),
+                    _divider(),
                     _actionRow(
                       icon: Icons.cleaning_services_rounded,
                       label: 'Очистить кэш изображений',
                       subtitle: 'Освобождает место на устройстве',
                       color: const Color(0xFF7C6FF7),
                       onTap: _clearImageCache,
+                    ),
+                    _divider(),
+                    _actionRow(
+                      icon: Icons.auto_fix_high_rounded,
+                      label: 'Сжать прогресс чтения',
+                      subtitle: 'Удалить устаревшие записи прогресса',
+                      color: const Color(0xFF4CAF96),
+                      onTap: _pruneProgress,
                     ),
                     _divider(),
                     _actionRow(

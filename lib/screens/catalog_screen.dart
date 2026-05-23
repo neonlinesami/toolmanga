@@ -12,6 +12,7 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'new_chapters_screen.dart';
 import 'search_screen.dart';
+import 'home_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -31,7 +32,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   String _sortBy = 'weekViews';
   String? _selectedType;
   String? _selectedStatus;
-  int _selectedNav = 0; // 0=catalog,1=bookmarks,2=profile,3=history
+  int _selectedNav = 0; // 0=home,1=bookmarks,2=search(center),3=history,4=more
 
   @override
   void initState() {
@@ -152,7 +153,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             _buildHeader(),
             Expanded(
               child: _selectedNav == 0
-                  ? _buildCatalog()
+                  ? const HomeScreen()
                   : _selectedNav == 1
                   ? const BookmarksScreen()
                   : _selectedNav == 3
@@ -170,7 +171,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     String title;
     switch (_selectedNav) {
       case 0:
-        title = 'Каталог';
+        title = 'Главная';
         break;
       case 1:
         title = 'Закладки';
@@ -179,7 +180,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         title = 'Профиль';
         break;
       default:
-        title = 'Каталог';
+        title = 'Главная';
     }
 
     return AnimatedContainer(
@@ -204,51 +205,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
           ),
           const Spacer(),
-          // Кнопка поиска (только для каталога)
-          if (_selectedNav == 0) ...[
-            IconButton(
-              icon: const Icon(Icons.search_rounded, color: Colors.white70),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SearchScreen()),
-              ),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
+          // Кнопка поиска — всегда видна
+          IconButton(
+            icon: const Icon(Icons.search_rounded, color: Colors.white70),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
             ),
-            // Фильтры с индикатором
-            Stack(
-              children: [
-                IconButton(
-                  icon:
-                  const Icon(Icons.tune_rounded, color: Colors.white70),
-                  onPressed: _showFilters,
-                  style: IconButton.styleFrom(
-                    backgroundColor: _hasActiveFilters
-                        ? const Color(0xFF7C6FF7).withOpacity(0.15)
-                        : Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                if (_hasActiveFilters)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF7C6FF7),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -354,10 +323,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _MoreSheet(
-        onSettings: () {
+        onCatalog: () {
           Navigator.pop(ctx);
           Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              MaterialPageRoute(builder: (_) => const _CatalogPage()));
+        },
+        onSettings: () {
+          Navigator.pop(ctx);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
         },
         onNewChapters: () {
           Navigator.pop(ctx);
@@ -407,10 +380,10 @@ class _DutyIsBottomNav extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // 0 — Каталог
+              // 0 — Главная
               _IslandNavItem(
-                icon: Icons.grid_view_rounded,
-                label: 'Каталог',
+                icon: Icons.home_rounded,
+                label: 'Главная',
                 active: selectedIndex == 0,
                 onTap: () => onTap(0),
               ),
@@ -593,10 +566,15 @@ class _MiniLogoPainter extends CustomPainter {
 
 // ─── More sheet ───────────────────────────────────────────────────────────────
 class _MoreSheet extends StatelessWidget {
+  final VoidCallback onCatalog;
   final VoidCallback onSettings;
   final VoidCallback onNewChapters;
 
-  const _MoreSheet({required this.onSettings, required this.onNewChapters});
+  const _MoreSheet({
+    required this.onCatalog,
+    required this.onSettings,
+    required this.onNewChapters,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -620,6 +598,16 @@ class _MoreSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
+          _MoreTile(
+            icon: Icons.grid_view_rounded,
+            label: 'Каталог',
+            onTap: onCatalog,
+          ),
+          Divider(
+              color: Colors.white.withOpacity(0.06),
+              height: 1,
+              indent: 16,
+              endIndent: 16),
           _MoreTile(
             icon: Icons.new_releases_rounded,
             label: 'Новые главы',
@@ -1038,6 +1026,212 @@ class _FilterSheetState extends State<_FilterSheet> {
           }).toList(),
         ),
       ],
+    );
+  }
+}
+
+// ─── Каталог как отдельный экран (открывается из «Ещё») ──────────────────────
+
+class _CatalogPage extends StatefulWidget {
+  const _CatalogPage();
+
+  @override
+  State<_CatalogPage> createState() => _CatalogPageState();
+}
+
+class _CatalogPageState extends State<_CatalogPage> {
+  final ScrollController _scroll = ScrollController();
+  List<MangaTitle> _titles = [];
+  bool _loading = false;
+  bool _hasMore = true;
+  int _page = 1;
+  String _sortBy = 'weekViews';
+  String? _selectedType;
+  String? _selectedStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _scroll.addListener(() {
+      if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 300) {
+        if (!_loading && _hasMore) { _page++; _load(); }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (_loading && !reset) return;
+    if (reset) setState(() { _titles = []; _page = 1; _hasMore = true; });
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService.getTitles(
+        page: _page, sortBy: _sortBy,
+        type: _selectedType, status: _selectedStatus,
+      );
+      if (mounted) {
+        setState(() {
+          _titles.addAll(result['titles'] as List<MangaTitle>);
+          _hasMore = _page < (result['pages'] as int);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool get _hasFilters =>
+      _selectedType != null || _selectedStatus != null || _sortBy != 'weekViews';
+
+  void _showFilters() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF13131F),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => _FilterSheet(
+        sortBy: _sortBy,
+        selectedType: _selectedType,
+        selectedStatus: _selectedStatus,
+        onApply: (sort, type, status) {
+          setState(() {
+            _sortBy = sort;
+            _selectedType = type;
+            _selectedStatus = status;
+          });
+          _load(reset: true);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A14),
+      body: SafeArea(
+        child: Column(children: [
+          // Заголовок
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0A14),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.06)),
+              ),
+            ),
+            child: Row(children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new,
+                      color: Colors.white70, size: 16),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('Каталог',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.search_rounded, color: Colors.white70),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SearchScreen())),
+              ),
+              Stack(children: [
+                IconButton(
+                  icon: const Icon(Icons.tune_rounded, color: Colors.white70),
+                  onPressed: _showFilters,
+                  style: IconButton.styleFrom(
+                    backgroundColor: _hasFilters
+                        ? const Color(0xFF7C6FF7).withOpacity(0.15)
+                        : Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                if (_hasFilters)
+                  Positioned(
+                    top: 8, right: 8,
+                    child: Container(
+                      width: 8, height: 8,
+                      decoration: const BoxDecoration(
+                          color: Color(0xFF7C6FF7), shape: BoxShape.circle),
+                    ),
+                  ),
+              ]),
+            ]),
+          ),
+          // Список
+          Expanded(
+            child: RefreshIndicator(
+              color: const Color(0xFF7C6FF7),
+              backgroundColor: const Color(0xFF161625),
+              onRefresh: () => _load(reset: true),
+              child: _titles.isEmpty && _loading
+                  ? GridView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.55,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8),
+                itemCount: 12,
+                itemBuilder: (_, __) => Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161625),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              )
+                  : GridView.builder(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.55,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8),
+                itemCount: _titles.length + (_hasMore ? 3 : 0),
+                itemBuilder: (ctx, i) {
+                  if (i >= _titles.length) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161625),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    );
+                  }
+                  return _TitleCard(
+                    title: _titles[i],
+                    onTap: () => Navigator.push(ctx,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                TitleScreen(title: _titles[i]))),
+                  );
+                },
+              ),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

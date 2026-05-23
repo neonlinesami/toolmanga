@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/title_model.dart';
-import '../models/chapter_model.dart';
 import '../services/api_service.dart';
 import 'title_screen.dart';
 import 'reader_screen.dart';
@@ -14,7 +12,7 @@ class NewChaptersScreen extends StatefulWidget {
 }
 
 class _NewChaptersScreenState extends State<NewChaptersScreen> {
-  List<_TitleWithChapters> _items = [];
+  List<UpdateItem> _items = [];
   bool _loading = true;
   bool _hasMore = true;
   int _page = 1;
@@ -48,26 +46,12 @@ class _NewChaptersScreenState extends State<NewChaptersScreen> {
     }
     setState(() => _loading = true);
     try {
-      final result = await ApiService.getTitles(
+      final result = await ApiService.getLatestUpdates(
         page: _page,
-        sortBy: 'updatedAt',
-        sortOrder: 'desc',
-        limit: 20,
+        limit: 30,
       );
-      final titles = result['titles'] as List<MangaTitle>;
+      final newItems = result['items'] as List<UpdateItem>;
       final totalPages = result['pages'] as int;
-
-      final newItems = <_TitleWithChapters>[];
-      for (final t in titles) {
-        try {
-          final chapters = await ApiService.getChapters(t.id, sortOrder: 'desc');
-          if (chapters.isNotEmpty) {
-            newItems.add(_TitleWithChapters(title: t, latestChapter: chapters.first));
-          }
-        } catch (_) {
-          // skip titles that fail to load chapters
-        }
-      }
 
       if (mounted) {
         setState(() {
@@ -102,58 +86,60 @@ class _NewChaptersScreenState extends State<NewChaptersScreen> {
                 child: _items.isEmpty && _loading
                     ? _buildShimmer()
                     : _items.isEmpty
-                        ? const Center(
-                            child: Text('Ничего нет',
-                                style: TextStyle(color: Colors.white38)),
-                          )
-                        : ListView.builder(
-                            controller: _scroll,
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                            itemCount: _items.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (ctx, i) {
-                              if (i == _items.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(20),
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF7C6FF7),
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return _ChapterCard(
-                                item: _items[i],
-                                onTapTitle: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        TitleScreen(title: _items[i].title),
-                                  ),
-                                ),
-                                onTapChapter: () async {
-                                  // Load all chapters for reader
-                                  try {
-                                    final chapters = await ApiService.getChapters(
-                                      _items[i].title.id,
-                                    );
-                                    if (mounted) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ReaderScreen(
-                                            chapter: _items[i].latestChapter,
-                                            title: _items[i].title,
-                                            chapters: chapters,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } catch (_) {}
-                                },
-                              );
-                            },
+                    ? const Center(
+                  child: Text('Ничего нет',
+                      style: TextStyle(color: Colors.white38)),
+                )
+                    : ListView.builder(
+                  controller: _scroll,
+                  padding:
+                  const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: _items.length + (_hasMore ? 1 : 0),
+                  itemBuilder: (ctx, i) {
+                    if (i == _items.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF7C6FF7),
+                            strokeWidth: 2,
                           ),
+                        ),
+                      );
+                    }
+                    final item = _items[i];
+                    return _ChapterCard(
+                      item: item,
+                      onTapTitle: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              TitleScreen(title: item.title),
+                        ),
+                      ),
+                      onTapChapter: () async {
+                        if (item.chapter.isLocked) return;
+                        try {
+                          final chapters =
+                          await ApiService.getChapters(
+                              item.title.id);
+                          if (mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ReaderScreen(
+                                  chapter: item.chapter,
+                                  title: item.title,
+                                  chapters: chapters,
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (_) {}
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -168,7 +154,8 @@ class _NewChaptersScreenState extends State<NewChaptersScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A14),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.06), width: 1),
+          bottom:
+          BorderSide(color: Colors.white.withOpacity(0.06), width: 1),
         ),
       ),
       child: Row(
@@ -197,7 +184,8 @@ class _NewChaptersScreenState extends State<NewChaptersScreen> {
           ),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color: const Color(0xFF7C6FF7),
               borderRadius: BorderRadius.circular(6),
@@ -229,14 +217,8 @@ class _NewChaptersScreenState extends State<NewChaptersScreen> {
   }
 }
 
-class _TitleWithChapters {
-  final MangaTitle title;
-  final Chapter latestChapter;
-  _TitleWithChapters({required this.title, required this.latestChapter});
-}
-
 class _ChapterCard extends StatelessWidget {
-  final _TitleWithChapters item;
+  final UpdateItem item;
   final VoidCallback onTapTitle;
   final VoidCallback onTapChapter;
 
@@ -248,7 +230,7 @@ class _ChapterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ch = item.latestChapter;
+    final ch = item.chapter;
     final t = item.title;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -286,10 +268,11 @@ class _ChapterCard extends StatelessWidget {
               ),
             ),
           ),
-          // Info
+          // Инфо
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -351,7 +334,7 @@ class _ChapterCard extends StatelessWidget {
               ),
             ),
           ),
-          // Date
+          // Дата
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Text(

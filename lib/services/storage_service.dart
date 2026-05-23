@@ -34,7 +34,10 @@ class StorageService {
   static Future<List<Map<String, dynamic>>> getHistory() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_historyKey) ?? [];
-    return raw.map((s) => jsonDecode(s) as Map<String, dynamic>).toList();
+    return raw.map((s) {
+      final decoded = jsonDecode(s);
+      return Map<String, dynamic>.from(decoded as Map);
+    }).toList();
   }
 
   static Future<void> addToHistory({
@@ -48,7 +51,10 @@ class StorageService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_historyKey) ?? [];
-    final history = raw.map((s) => jsonDecode(s) as Map<String, dynamic>).toList();
+    final history = raw.map((s) {
+      final decoded = jsonDecode(s);
+      return Map<String, dynamic>.from(decoded as Map);
+    }).toList();
 
     // Удалим старую запись для этого тайтла
     history.removeWhere((h) => h['titleId'] == titleId);
@@ -79,16 +85,78 @@ class StorageService {
   static Future<void> saveProgress(String chapterId, int page) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_progressKey);
-    final progress = raw != null ? jsonDecode(raw) as Map<String, dynamic> : {};
+
+    final Map<String, dynamic> progress = raw != null
+        ? Map<String, dynamic>.from(jsonDecode(raw) as Map)
+        : {};
+
     progress[chapterId] = page;
+
+    // Автоочистка: держим прогресс только для глав из истории чтения.
+    if (progress.length > 500) {
+      await _pruneProgress(prefs, progress);
+      return; // _pruneProgress сохраняет сам
+    }
+
     await prefs.setString(_progressKey, jsonEncode(progress));
+  }
+
+  /// Удаляет из прогресса записи глав, которые не встречаются в истории.
+  static Future<void> _pruneProgress(
+      SharedPreferences prefs,
+      Map<String, dynamic> progress,
+      ) async {
+    final raw = prefs.getStringList(_historyKey) ?? [];
+    final history = raw.map((s) {
+      final decoded = jsonDecode(s);
+      return Map<String, dynamic>.from(decoded as Map);
+    }).toList();
+
+    final knownChapterIds = history.map((h) => h['chapterId'] as String).toSet();
+
+    progress.removeWhere((key, _) => !knownChapterIds.contains(key));
+    await prefs.setString(_progressKey, jsonEncode(progress));
+  }
+
+  /// Принудительная очистка прогресса: оставляет только главы из истории.
+  static Future<int> pruneProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_progressKey);
+    if (raw == null) return 0;
+
+    final progress = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    final before = progress.length;
+    await _pruneProgress(prefs, progress);
+    return before - progress.length;
+  }
+
+  /// Полная очистка всех данных приложения.
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_bookmarksKey);
+    await prefs.remove(_historyKey);
+    await prefs.remove(_progressKey);
+  }
+
+  /// Приблизительный размер хранилища (сумма длин всех строк в байтах).
+  static Future<int> estimateStorageBytes() async {
+    final prefs = await SharedPreferences.getInstance();
+    int total = 0;
+    final history = prefs.getStringList(_historyKey) ?? [];
+    for (final s in history) total += s.length;
+    final progress = prefs.getString(_progressKey) ?? '';
+    total += progress.length;
+    final bookmarks = prefs.getStringList(_bookmarksKey) ?? [];
+    for (final s in bookmarks) total += s.length;
+    return total;
   }
 
   static Future<int> getProgress(String chapterId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_progressKey);
     if (raw == null) return 1;
-    final progress = jsonDecode(raw) as Map<String, dynamic>;
+
+    final progress = Map<String, dynamic>.from(jsonDecode(raw) as Map);
     return progress[chapterId] ?? 1;
   }
 
